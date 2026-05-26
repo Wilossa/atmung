@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slow Breathing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=DM+Sans:wght@200;300&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --ball: #00aaff;
+    --text: #e8e8f0;
+    --text-dim: #606070;
+    --empty: #2a2a2e;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  h1 {
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* Ball container – fixed size so layout doesn't shift */
+  .ball-wrap {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #ball {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #33ccff, #00aaff 60%, #0066cc);
+    width: 150px;
+    height: 150px;
+    /* smooth size transitions handled by JS via CSS transition */
+    transition: width 0.05s linear, height 0.05s linear;
+    box-shadow: 0 0 40px rgba(0,170,255,0.25);
+  }
+
+  .center-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  #phase-label {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 200;
+    font-size: 1.1rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  #timer {
+    font-family: 'DM Mono', monospace;
+    font-weight: 400;
+    font-size: 2.6rem;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  #ready-msg {
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    transition: opacity 0.4s;
+  }
+
+  /* controls */
+  .controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .timing-row {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+  }
+
+  .timing-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .timing-field label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .timing-field input {
+    width: 54px;
+    background: #1a1a1e;
+    border: 1px solid var(--empty);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    text-align: center;
+    padding: 0.3rem 0;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .timing-field input:focus { border-color: var(--ball); }
+
+  .btn-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 0.25rem;
+  }
+
+  #start-btn {
+    padding: 0.55rem 2.2rem;
+    background: transparent;
+    border: 1px solid var(--ball);
+    border-radius: 3px;
+    color: var(--ball);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  #start-btn:hover { background: var(--ball); color: var(--bg); }
+
+  #sound-btn {
+    padding: 0.55rem 1.2rem;
+    background: transparent;
+    border: 1px solid var(--empty);
+    border-radius: 3px;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  #sound-btn:hover { border-color: var(--text-dim); color: var(--text); }
+  #sound-btn.on { border-color: var(--ball); color: var(--ball); }
+
+  .cycles-row {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+
+<h1>Slow Breathing</h1>
+
+<div class="ball-wrap">
+  <div id="ball"></div>
+  <div class="center-text">
+    <div id="ready-msg">bereit machen …</div>
+    <div id="phase-label"></div>
+    <div id="timer"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="timing-row">
+    <div class="timing-field">
+      <label>Einatmen</label>
+      <input type="number" id="t-in" value="4" min="1" max="30">
+    </div>
+    <div class="timing-field">
+      <label>Halten</label>
+      <input type="number" id="t-hold-in" value="0" min="0" max="30">
+    </div>
+    <div class="timing-field">
+      <label>Ausatmen</label>
+      <input type="number" id="t-out" value="6" min="1" max="30">
+    </div>
+    <div class="timing-field">
+      <label>Pause</label>
+      <input type="number" id="t-hold-out" value="0" min="0" max="30">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button id="start-btn">Start</button>
+    <button id="sound-btn" class="on">🔊 Ton</button>
+  </div>
+  <div class="cycles-row" id="cycle-counter"></div>
+</div>
+
+<script>
+// ── Settings ───────────────────────────────────────────────────────
+let T_IN = 4, T_HOLD_IN = 0, T_OUT = 6, T_HOLD_OUT = 0;
+const MIN_D = 150, MAX_D = 290; // pixel diameters
+
+// ── Audio ──────────────────────────────────────────────────────────
+let audioCtx = null;
+let soundEnabled = true;
+
+const soundBtn = document.getElementById('sound-btn');
+soundBtn.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  soundBtn.textContent = soundEnabled ? '🔊 Ton' : '🔇 Ton';
+  soundBtn.classList.toggle('on', soundEnabled);
+});
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playTone(freq, dur = 0.45, vol = 0.45) {
+  if (!soundEnabled) return;
+  ensureAudio();
+  const ctx = audioCtx;
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  const now  = ctx.currentTime;
+  const fade = 0.015;
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, now);
+
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(vol, now + fade);
+  gain.gain.setValueAtTime(vol, now + dur - fade);
+  gain.gain.linearRampToValueAtTime(0, now + dur);
+
+  osc.start(now);
+  osc.stop(now + dur);
+}
+
+const TONES = { in: 528, holdIn: 462, out: 396, holdOut: 462 };
+
+// ── Ball element ───────────────────────────────────────────────────
+const ballEl     = document.getElementById('ball');
+const phaseLabel = document.getElementById('phase-label');
+const timerEl    = document.getElementById('timer');
+const readyMsg   = document.getElementById('ready-msg');
+const cycleCount = document.getElementById('cycle-counter');
+const btn        = document.getElementById('start-btn');
+
+function setBallSize(d) {
+  ballEl.style.width  = d + 'px';
+  ballEl.style.height = d + 'px';
+}
+
+function show(el, on) { el.style.opacity = on ? '1' : '0'; }
+
+// ── State machine ──────────────────────────────────────────────────
+// Phases: in → holdIn → out → holdOut → repeat
+const PHASES = [
+  { key: 'in',      label: 'Einatmen',  tone: 'in',      tKey: () => T_IN,       dir: 1  },
+  { key: 'holdIn',  label: 'Halten',    tone: 'holdIn',  tKey: () => T_HOLD_IN,  dir: 0  },
+  { key: 'out',     label: 'Ausatmen',  tone: 'out',     tKey: () => T_OUT,      dir: -1 },
+  { key: 'holdOut', label: 'Pause',     tone: 'holdOut', tKey: () => T_HOLD_OUT, dir: 0  },
+];
+
+let running   = false;
+let phaseIdx  = 0;
+let phaseStart = null;
+let cycles    = 0;
+let rafId     = null;
+
+function startPhase(idx) {
+  phaseIdx   = idx;
+  phaseStart = performance.now();
+  const ph   = PHASES[idx];
+  playTone(TONES[ph.tone]);
+  phaseLabel.textContent = ph.label;
+  show(phaseLabel, true);
+  show(timerEl, true);
+}
+
+function tick(now) {
+  if (!running) return;
+
+  const ph      = PHASES[phaseIdx];
+  const durMs   = ph.tKey() * 1000;
+  const elapsed = now - phaseStart;
+  const frac    = durMs > 0 ? Math.min(elapsed / durMs, 1) : 1;
+  const remaining = Math.max(0, durMs - elapsed);
+
+  timerEl.textContent = Math.ceil(remaining / 1000) + 's';
+
+  // Animate ball size based on phase direction
+  if (ph.dir === 1) {
+    // inhale: small → large
+    setBallSize(MIN_D + frac * (MAX_D - MIN_D));
+  } else if (ph.dir === -1) {
+    // exhale: large → small
+    setBallSize(MAX_D - frac * (MAX_D - MIN_D));
+  }
+  // dir === 0: hold, ball stays put
+
+  if (frac >= 1 || durMs === 0) {
+    nextPhase();
+  } else {
+    rafId = requestAnimationFrame(tick);
+  }
+}
+
+function nextPhase() {
+  phaseIdx = (phaseIdx + 1) % PHASES.length;
+  if (phaseIdx === 0) {
+    cycles++;
+    cycleCount.textContent = `Zyklen: ${cycles}`;
+  }
+  startPhase(phaseIdx);
+  rafId = requestAnimationFrame(tick);
+}
+
+function startBreathing() {
+  readPhases();
+  running = true;
+  cycles  = 0;
+  show(readyMsg, false);
+  cycleCount.textContent = 'Zyklen: 0';
+  btn.textContent = 'Stop';
+  setBallSize(MIN_D);
+
+  readyMsg.textContent = 'Los geht\'s …';
+  show(readyMsg, true);
+  setTimeout(() => {
+    show(readyMsg, false);
+    startPhase(0);
+    rafId = requestAnimationFrame(tick);
+  }, 1800);
+}
+
+function stopBreathing() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  setBallSize(MIN_D);
+  show(phaseLabel, false);
+  show(timerEl, false);
+  readyMsg.textContent = 'bereit machen …';
+  show(readyMsg, true);
+  btn.textContent = 'Start';
+}
+
+function readPhases() {
+  T_IN       = parseFloat(document.getElementById('t-in').value)      || 4;
+  T_HOLD_IN  = parseFloat(document.getElementById('t-hold-in').value) || 0;
+  T_OUT      = parseFloat(document.getElementById('t-out').value)     || 6;
+  T_HOLD_OUT = parseFloat(document.getElementById('t-hold-out').value)|| 0;
+}
+
+btn.addEventListener('click', () => {
+  if (running) stopBreathing(); else startBreathing();
+});
+</script>
+</body>
+</html>

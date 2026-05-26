@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Box Breathing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=DM+Sans:wght@200;300&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --square: #00aaff;
+    --empty: #2a2a2e;
+    --text: #e8e8f0;
+    --text-dim: #606070;
+    --size: 300px;
+    --lw: 10px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* subtle noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  h1 {
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .canvas-wrap {
+    position: relative;
+    width: var(--size);
+    height: var(--size);
+  }
+
+  svg#sq {
+    width: var(--size);
+    height: var(--size);
+    overflow: visible;
+  }
+
+  .center-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    pointer-events: none;
+  }
+
+  #phase-label {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 200;
+    font-size: 1.15rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  #timer {
+    font-family: 'DM Mono', monospace;
+    font-weight: 400;
+    font-size: 2.8rem;
+    color: var(--square);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  #ready-msg {
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    transition: opacity 0.4s;
+  }
+
+  /* controls */
+  .controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .timing-row {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+  }
+
+  .timing-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .timing-field label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .timing-field input {
+    width: 54px;
+    background: #1a1a1e;
+    border: 1px solid var(--empty);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    text-align: center;
+    padding: 0.3rem 0;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .timing-field input:focus { border-color: var(--square); }
+
+  #start-btn {
+    margin-top: 0.25rem;
+    padding: 0.55rem 2.2rem;
+    background: transparent;
+    border: 1px solid var(--square);
+    border-radius: 3px;
+    color: var(--square);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  #start-btn:hover { background: var(--square); color: var(--bg); }
+
+  .cycles-row {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  #sound-btn {
+    padding: 0.55rem 1.2rem;
+    background: transparent;
+    border: 1px solid var(--empty);
+    border-radius: 3px;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  #sound-btn:hover { border-color: var(--text-dim); color: var(--text); }
+  #sound-btn.on { border-color: var(--square); color: var(--square); }
+</style>
+</head>
+<body>
+
+<h1>Box Breathing</h1>
+
+<div class="canvas-wrap">
+  <svg id="sq" viewBox="0 0 300 300">
+    <!-- background square -->
+    <rect id="bg-rect" x="5" y="5" width="290" height="290"
+          fill="none" stroke="#2a2a2e" stroke-width="10"
+          stroke-linejoin="round" rx="2"/>
+    <!-- animated snake path -->
+    <polyline id="snake" points="295,5 295,5"
+              fill="none" stroke="#00aaff" stroke-width="10"
+              stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div class="center-text">
+    <div id="ready-msg">bereit machen …</div>
+    <div id="phase-label"></div>
+    <div id="timer"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="timing-row">
+    <div class="timing-field">
+      <label>Einatmen</label>
+      <input type="number" id="t-in" value="4" min="1" max="30">
+    </div>
+    <div class="timing-field">
+      <label>Halten</label>
+      <input type="number" id="t-hold-in" value="4" min="0" max="30">
+    </div>
+    <div class="timing-field">
+      <label>Ausatmen</label>
+      <input type="number" id="t-out" value="4" min="1" max="30">
+    </div>
+    <div class="timing-field">
+      <label>Pause</label>
+      <input type="number" id="t-hold-out" value="4" min="0" max="30">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button id="start-btn">Start</button>
+    <button id="sound-btn" class="on">🔊 Ton</button>
+  </div>
+  <div class="cycles-row" id="cycle-counter"></div>
+</div>
+
+<script>
+// ── Timing (seconds) ──────────────────────────────────────────────
+let T_IN = 4, T_HOLD_IN = 4, T_OUT = 4, T_HOLD_OUT = 4;
+
+// ── Audio (Web Audio API) ─────────────────────────────────────────
+let audioCtx = null;
+let soundEnabled = true;
+
+const soundBtn = document.getElementById('sound-btn');
+soundBtn.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  soundBtn.textContent = soundEnabled ? '🔊 Ton' : '🔇 Ton';
+  soundBtn.classList.toggle('on', soundEnabled);
+});
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playSweep(f0, f1, dur = 0.55, vol = 0.45) {
+  if (!soundEnabled) return;
+  ensureAudio();
+  const ctx = audioCtx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  const now = ctx.currentTime;
+  const fade = 0.02;
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(f0, now);
+  osc.frequency.linearRampToValueAtTime(f1, now + dur);
+
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(vol, now + fade);
+  gain.gain.setValueAtTime(vol, now + dur - fade);
+  gain.gain.linearRampToValueAtTime(0, now + dur);
+
+  osc.start(now);
+  osc.stop(now + dur);
+}
+
+// Tone presets
+const TONES = {
+  in:      [330, 528],
+  holdIn:  [528, 495],
+  out:     [462, 330],
+  holdOut: [330, 363],
+};
+
+// ── SVG geometry ──────────────────────────────────────────────────
+const PAD = 5, SIDE = 290; // viewBox coords
+// corners of the square, traversal order: TR → BR → BL → TL → TR
+const CORNERS = [
+  [PAD + SIDE, PAD],           // TR
+  [PAD + SIDE, PAD + SIDE],    // BR
+  [PAD,        PAD + SIDE],    // BL
+  [PAD,        PAD],           // TL
+  [PAD + SIDE, PAD],           // TR (wrap)
+];
+
+function pointsForProgress(p) {
+  // p: 0–1 over full perimeter (4 × SIDE)
+  const dist = p * 4 * SIDE;
+  const pts = [[PAD + SIDE, PAD]]; // always start at TR
+
+  let remaining = dist;
+  for (let seg = 0; seg < 4; seg++) {
+    const a = CORNERS[seg], b = CORNERS[seg + 1];
+    const segLen = SIDE;
+    if (remaining <= 0) break;
+    if (remaining >= segLen) {
+      pts.push([b[0], b[1]]);
+      remaining -= segLen;
+    } else {
+      const t = remaining / segLen;
+      pts.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      remaining = 0;
+    }
+  }
+  return pts;
+}
+
+function drawSnake(progress) {
+  const pts = pointsForProgress(Math.min(Math.max(progress, 0), 0.9999));
+  document.getElementById('snake').setAttribute(
+    'points',
+    pts.map(p => p.join(',')).join(' ')
+  );
+}
+
+// ── State machine ─────────────────────────────────────────────────
+const PHASES = [
+  { key: 'in',      label: 'Einatmen',  tone: 'in',      tKey: () => T_IN,       base: 0    },
+  { key: 'holdIn',  label: 'Halten',    tone: 'holdIn',  tKey: () => T_HOLD_IN,  base: 0.25 },
+  { key: 'out',     label: 'Ausatmen',  tone: 'out',     tKey: () => T_OUT,      base: 0.5  },
+  { key: 'holdOut', label: 'Pause',     tone: 'holdOut', tKey: () => T_HOLD_OUT, base: 0.75 },
+];
+
+let running = false;
+let phaseIdx = 0;
+let phaseStart = null;
+let cycles = 0;
+let rafId = null;
+
+const phaseLabel = document.getElementById('phase-label');
+const timerEl    = document.getElementById('timer');
+const readyMsg   = document.getElementById('ready-msg');
+const cycleCount = document.getElementById('cycle-counter');
+const btn        = document.getElementById('start-btn');
+
+function show(el, on) { el.style.opacity = on ? '1' : '0'; }
+
+function startPhase(idx) {
+  phaseIdx = idx;
+  phaseStart = performance.now();
+  const ph = PHASES[idx];
+  playSweep(...TONES[ph.tone]);
+  phaseLabel.textContent = ph.label;
+  show(phaseLabel, true);
+  show(timerEl, true);
+}
+
+function tick(now) {
+  if (!running) return;
+
+  const ph   = PHASES[phaseIdx];
+  const dur  = ph.tKey() * 1000;
+  const elapsed = now - phaseStart;
+  const remaining = Math.max(0, dur - elapsed);
+  const frac  = dur > 0 ? Math.min(elapsed / dur, 1) : 1;
+
+  // Skip zero-duration hold phases instantly
+  if (dur === 0) {
+    nextPhase();
+    return;
+  }
+
+  const progress = ph.base + frac * 0.25;
+  drawSnake(progress);
+  timerEl.textContent = Math.ceil(remaining / 1000) + 's';
+
+  if (frac >= 1) {
+    nextPhase();
+  } else {
+    rafId = requestAnimationFrame(tick);
+  }
+}
+
+function nextPhase() {
+  phaseIdx = (phaseIdx + 1) % PHASES.length;
+  if (phaseIdx === 0) {
+    cycles++;
+    cycleCount.textContent = `Zyklen: ${cycles}`;
+  }
+  startPhase(phaseIdx);
+  rafId = requestAnimationFrame(tick);
+}
+
+function startBreathing() {
+  readPhases();
+  running = true;
+  cycles  = 0;
+  show(readyMsg, false);
+  cycleCount.textContent = 'Zyklen: 0';
+  btn.textContent = 'Stop';
+
+  // 2 s "Get ready" delay
+  drawSnake(0);
+  readyMsg.textContent = 'Los geht\'s …';
+  show(readyMsg, true);
+  setTimeout(() => {
+    show(readyMsg, false);
+    startPhase(0);
+    rafId = requestAnimationFrame(tick);
+  }, 1800);
+}
+
+function stopBreathing() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  drawSnake(0);
+  show(phaseLabel, false);
+  show(timerEl, false);
+  readyMsg.textContent = 'bereit machen …';
+  show(readyMsg, true);
+  btn.textContent = 'Start';
+}
+
+function readPhases() {
+  T_IN       = parseFloat(document.getElementById('t-in').value)      || 4;
+  T_HOLD_IN  = parseFloat(document.getElementById('t-hold-in').value) || 0;
+  T_OUT      = parseFloat(document.getElementById('t-out').value)     || 4;
+  T_HOLD_OUT = parseFloat(document.getElementById('t-hold-out').value)|| 0;
+}
+
+btn.addEventListener('click', () => {
+  if (running) stopBreathing(); else startBreathing();
+});
+</script>
+</body>
+</html>
